@@ -7,12 +7,12 @@ import (
 
 // Estrutura que armazena o hash e a data de modificação de um arquivo
 type fileInfo struct {
-	hash int
+	hash         int
 	lastModified string
 }
 
 // Lê um arquivo e retorna o conteúdo em bytes e a data de modificação
-func readFile(filePath string) ([]byte ,string, error) {
+func readFile(filePath string) ([]byte, string, error) {
 	data, readErr := os.ReadFile(filePath)
 	if readErr != nil {
 		fmt.Printf("Error reading file %s: %v", filePath, readErr)
@@ -34,7 +34,7 @@ func readFile(filePath string) ([]byte ,string, error) {
 // Retorna o valor refetente ao hash de um arquivo
 func fileToHash(filePath string, hashes chan fileInfo) (int, string, error) {
 	data, lastModified, err := readFile(filePath)
-	
+
 	if err != nil {
 		return 0, " ", err
 	}
@@ -46,7 +46,7 @@ func fileToHash(filePath string, hashes chan fileInfo) (int, string, error) {
 	}
 
 	hashes <- fileInfo{hash, lastModified}
-	
+
 	return hash, lastModified, nil
 }
 
@@ -64,7 +64,7 @@ func sendHash() {
 
 	for _, file := range files {
 		filePath := dirPath + "/" + file.Name()
-		go fileToHash(filePath, hashes)	
+		go fileToHash(filePath, hashes)
 	}
 
 	for range files {
