@@ -22,7 +22,7 @@ type IpsConfigs struct {
 func main() {
 
 	//escuta na porta 8000 (pode ser monitorado com lsof -Pn -i4 | grep 8000)
-	listener, err := net.Listen("tcp", "172.17.0.1:8000")
+	listener, err := net.Listen("tcp", "0.0.0.0:8000")
 
 	jsonFile, err := os.Open(`ips.json`)
 
