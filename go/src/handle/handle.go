@@ -1,5 +1,6 @@
 // Adaptado de Alan A. A. Donovan & Brian W. Kernighan.
-// a TCP server that periodically writes the time.
+// Um servidor TCP que escuta por requisições de busca de arquivos e retorna IPs das máquinas que possuem o arquivo solicitado.
+
 package main
 
 import (
@@ -12,140 +13,138 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type IpsConfigs struct {
 	Ips []string `json:"ips"`
 }
 
+var ipsConfigs IpsConfigs
+
 func main() {
+	// Carregar IPs das máquinas
+	loadIpsConfigs()
 
-	//escuta na porta 8000 (pode ser monitorado com lsof -Pn -i4 | grep 8000)
-	listener, err := net.Listen("tcp", "0.0.0.0:8000")
-
-	jsonFile, err := os.Open(`ips.json`)
-
-	byteValueJSON, _ := ioutil.ReadAll(jsonFile)
-
-	//Declaração abreviada de um objeto do tipo Book
-	objIps := IpsConfigs{}
-
-	//Conversão da variável byte em um objeto do tipo struct Book
-	json.Unmarshal(byteValueJSON, &objIps)
-
-	fmt.Println(objIps.Ips)
-
+	// Escuta na porta 8000
+	listener, err := net.Listen("tcp", "150.165.74.47:8000")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer listener.Close()
+
 	for {
-		//aceita uma conexão criada por um cliente
+		// Aceita uma conexão criada por um cliente
 		conn, err := listener.Accept()
 		if err != nil {
-			// falhas na conexão. p.ex abortamento
 			log.Print(err)
 			continue
 		}
-		// serve a conexão estabelecida
+		// Serve a conexão estabelecida
 		go handleConn(conn)
-
 	}
 }
-func search(hash int) {
 
+func loadIpsConfigs() {
+	jsonFile, err := os.Open("ips.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer jsonFile.Close()
+
+	byteValueJSON, _ := ioutil.ReadAll(jsonFile)
+	err = json.Unmarshal(byteValueJSON, &ipsConfigs)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func handleConn(c net.Conn) {
-
 	defer c.Close()
 	for {
 		netData, err := bufio.NewReader(c).ReadString('\n')
-		partes := strings.SplitN(netData, " ", 2)
-		if partes[0] == "search" {
-			num, err := strconv.Atoi(partes[1])
-			if err != nil {
-				files := sendHash()
-				fmt.Println(files)
-				search(num)
-			}
-		}
-		fmt.Println(netData)
-
 		if err != nil {
+			log.Print(err)
 			return
 		}
-		time.Sleep(1 * time.Second)
+
+		netData = strings.TrimSpace(netData)
+		partes := strings.SplitN(netData, " ", 2)
+		if len(partes) < 2 {
+			continue
+		}
+
+		if partes[0] == "search" {
+			hash, err := strconv.Atoi(partes[1])
+			if err != nil {
+				fmt.Fprintln(c, "Invalid hash")
+				continue
+			}
+			// Realiza a busca e envia os IPs das máquinas que possuem o arquivo
+			result := search(hash)
+			if len(result) == 0 {
+				fmt.Fprintln(c, "Não achamos nenhum arquivo com o mesmo hash")
+			} else {
+				for _, ip := range result {
+					fmt.Fprintln(c, ip)
+				}
+			}
+		}
 	}
 }
 
-// HashFiles
-// Estrutura que armazena o hash e a data de modificação de um arquivo
-type fileInfo struct {
-	hash         int
-	lastModified string
-}
-
-// Lê um arquivo e retorna o conteúdo em bytes e a data de modificação
-func readFile(filePath string) ([]byte, string, error) {
-	data, readErr := os.ReadFile(filePath)
-	if readErr != nil {
-		fmt.Printf("Error reading file %s: %v", filePath, readErr)
-		return nil, " ", readErr
-	}
-
-	fileInfo, infoErr := os.Stat(filePath)
-
-	if infoErr != nil {
-		fmt.Printf("Error reading file %s: %v", filePath, infoErr)
-		return nil, " ", infoErr
-	}
-
-	lastModified := fileInfo.ModTime().String()
-
-	return data, lastModified, nil
-}
-
-// Retorna o valor refetente ao hash de um arquivo
-func fileToHash(filePath string, hashes chan fileInfo) (int, string, error) {
-	data, lastModified, err := readFile(filePath)
-
+func search(hash int) []string {
+	var result []string
+	// Simula a busca dos arquivos na máquina atual
+	dirPath := "/tmp/dataset"
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		return 0, " ", err
+		fmt.Printf("Error reading directory %s: %v", dirPath, err)
+		return result
+	}
+
+	for _, file := range files {
+		filePath := dirPath + "/" + file.Name()
+		fileHash, err := fileToHash(filePath)
+		if err != nil {
+			continue
+		}
+		fmt.Println(fileHash)
+		if fileHash == hash {
+			// Se o hash do arquivo corresponde ao hash pesquisado, adicione o IP à lista de resultados
+			result = append(result, ipsConfigs.Ips[0]) // Aqui você pode fazer uma correspondência real com IPs das máquinas
+		}
+	}
+	fmt.Println(result)
+	return result
+}
+
+func fileToHash(filePath string) (int, error) {
+	data, _, err := readFile(filePath)
+	if err != nil {
+		return 0, err
 	}
 
 	hash := 0
-
 	for _, _byte := range data {
 		hash += int(_byte)
 	}
 
-	hashes <- fileInfo{hash, lastModified}
-
-	return hash, lastModified, nil
+	return hash, nil
 }
 
-// Envia o hash de todos os arquivos de um diretório para o servidor
-func sendHash() fileInfo {
-	dirPath := "/tmp/dataset"
-
-	files, err := os.ReadDir(dirPath)
-
+func readFile(filePath string) ([]byte, string, error) {
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("Error reading directory %s: %v", dirPath, err)
+		fmt.Printf("Error reading file %s: %v", filePath, err)
+		return nil, "", err
 	}
 
-	hashes := make(chan fileInfo, len(files))
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		fmt.Printf("Error reading file %s: %v", filePath, err)
+		return nil, "", err
+	}
 
-	for _, file := range files {
-		filePath := dirPath + "/" + file.Name()
-		go fileToHash(filePath, hashes)
-	}
-	var processedFile fileInfo
-	for range files {
-		processedFile := <-hashes
-		//enviar a variável processedFile para o servidor
-		fmt.Println(processedFile)
-	}
-	return processedFile
+	lastModified := fileInfo.ModTime().String()
+	return data, lastModified, nil
 }
