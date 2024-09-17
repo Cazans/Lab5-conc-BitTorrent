@@ -2,6 +2,7 @@ package hashfiles
 
 import (
 	"fmt"
+	"net"
 	"os"
 )
 
@@ -31,8 +32,8 @@ func readFile(filePath string) ([]byte, string, error) {
 	return data, lastModified, nil
 }
 
-// Retorna o valor refetente ao hash de um arquivo
-func fileToHash(filePath string, hashes chan fileInfo) (int, string, error) {
+// Retorna o valor referente ao hash de um arquivo
+func fileToHash(filePath string) (int, string, error) {
 	data, lastModified, err := readFile(filePath)
 
 	if err != nil {
@@ -40,35 +41,37 @@ func fileToHash(filePath string, hashes chan fileInfo) (int, string, error) {
 	}
 
 	hash := 0
-
 	for _, _byte := range data {
 		hash += int(_byte)
 	}
-
-	hashes <- fileInfo{hash, lastModified}
 
 	return hash, lastModified, nil
 }
 
 // Envia o hash de todos os arquivos de um diretório para o servidor
-func sendHash() {
-	dirPath := "tmp/dataset"
+func SendHash(conn net.Conn, clientIP string) {
+	dirPath := "/tmp/dataset" // Atualize conforme necessário
 
 	files, err := os.ReadDir(dirPath)
-
 	if err != nil {
-		fmt.Printf("Error reading directory %s: %v", dirPath, err)
+		fmt.Printf("Error reading directory %s: %v\n", dirPath, err)
+		return
 	}
-
-	hashes := make(chan fileInfo, len(files))
 
 	for _, file := range files {
 		filePath := dirPath + "/" + file.Name()
-		go fileToHash(filePath, hashes)
-	}
+		hash, _, err := fileToHash(filePath)
+		if err != nil {
+			fmt.Printf("Error hashing file %s: %v\n", filePath, err)
+			continue
+		}
 
-	for range files {
-		processedFile := <-hashes
-		//enviar a variável processedFile para o servidor
+		// Enviar a mensagem ao servidor no formato "update <hash> <ip>"
+		message := fmt.Sprintf("update %d %s\n", hash, clientIP)
+		_, err = conn.Write([]byte(message))
+		if err != nil {
+			fmt.Printf("Error sending hash to server: %v\n", err)
+			return
+		}
 	}
 }
