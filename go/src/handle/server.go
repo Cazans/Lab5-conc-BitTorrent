@@ -1,6 +1,3 @@
-// Adaptado de Alan A. A. Donovan & Brian W. Kernighan.
-// Um servidor TCP que escuta por requisições de busca de arquivos e retorna IPs das máquinas que possuem o arquivo solicitado.
-
 package main
 
 import (
@@ -13,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type IpsConfigs struct {
@@ -26,7 +24,7 @@ func main() {
 	loadIpsConfigs()
 
 	// Escuta na porta 8000
-	listener, err := net.Listen("tcp", "150.165.74.47:8000")
+	listener, err := net.Listen("tcp", "150.165.42.168:8000")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,104 +59,118 @@ func loadIpsConfigs() {
 func handleConn(c net.Conn) {
 	defer c.Close()
 	for {
+		// Ler a entrada do cliente
 		netData, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
-			log.Print(err)
 			return
 		}
-
 		netData = strings.TrimSpace(netData)
-		partes := strings.SplitN(netData, " ", 2)
-		if len(partes) < 2 {
+		parts := strings.SplitN(netData, " ", 2)
+		if len(parts) < 2 {
 			continue
 		}
 
-		if partes[0] == "search" {
-			hash, err := strconv.Atoi(partes[1])
+		// Comando "search" recebido
+		if parts[0] == "search" {
+			hash, err := strconv.Atoi(parts[1])
 			if err != nil {
 				fmt.Fprintln(c, "Invalid hash")
 				continue
 			}
-			// Realiza a busca e envia os IPs das máquinas que possuem o arquivo
-			result := search(hash)
-			if len(result) == 0 {
-				fmt.Fprintln(c, "Não achamos nenhum arquivo com o mesmo hash")
-			} else {
-				for _, ip := range result {
+
+			// Verifica localmente se o arquivo com o hash existe
+			localIP := getLocalIP()
+			foundMachines := []string{}
+
+			if searchForHash(hash) {
+				foundMachines = append(foundMachines, localIP)
+			}
+
+			// Busca nas outras máquinas da rede
+			otherMachines := broadcastSearch(hash)
+
+			// Adiciona as outras máquinas encontradas
+			foundMachines = append(foundMachines, otherMachines...)
+
+			// Envia a resposta para o cliente
+			if len(foundMachines) > 0 {
+				for _, ip := range foundMachines {
 					fmt.Fprintln(c, ip)
 				}
+			} else {
+				fmt.Fprintln(c, "Nenhuma máquina possui o arquivo.")
 			}
 		}
 	}
 }
 
-func search(hash int) []string {
-	var result []string
-
-	// Caminho para o diretório local
+func searchForHash(hash int) bool {
+	// Diretório onde estão os arquivos
 	dirPath := "/tmp/dataset"
+
+	// Lê todos os arquivos do diretório
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		fmt.Printf("Error reading directory %s: %v", dirPath, err)
-		return result
+		return false
 	}
 
-	// Verifica os arquivos locais primeiro
+	// Itera sobre cada arquivo no diretório
 	for _, file := range files {
 		filePath := dirPath + "/" + file.Name()
+
+		// Calcula o hash do arquivo
 		fileHash, err := fileToHash(filePath)
 		if err != nil {
 			continue
 		}
-		// Se o hash do arquivo corresponde ao hash pesquisado
+
+		// Verifica se o hash do arquivo é igual ao hash procurado
 		if fileHash == hash {
-			// Adiciona o IP da máquina local aos resultados
-			result = append(result, ipsConfigs.Ips[0]) // Aqui você pode usar o IP real da máquina local, se necessário
+			return true
 		}
 	}
 
-	// Agora vamos verificar as outras máquinas listadas em ips.json
+	// Nenhum arquivo com o hash correspondente foi encontrado
+	return false
+}
+
+func broadcastSearch(hash int) []string {
+	foundMachines := []string{}
+
+	// Itera sobre todos os IPs
 	for _, ip := range ipsConfigs.Ips {
-		if ip == "localhost" {
-			// Já verificamos os arquivos locais, então pulamos o IP da máquina local
+		// Pula o IP da máquina local
+		if ip == getLocalIP() {
 			continue
 		}
 
-		// Abre uma conexão TCP com a máquina remota
-		conn, err := net.Dial("tcp", ip+":8000")
+		// Conecta-se a cada IP
+		conn, err := net.DialTimeout("tcp", ip+":8000", 2*time.Second)
 		if err != nil {
-			fmt.Printf("Error connecting to %s: %v\n", ip, err)
+			fmt.Println("Erro ao conectar-se a", ip, ":", err)
 			continue
 		}
 		defer conn.Close()
 
-		// Envia a requisição de busca para a máquina remota
-		message := fmt.Sprintf("search %d\n", hash)
-		_, err = conn.Write([]byte(message))
-		if err != nil {
-			fmt.Printf("Error sending message to %s: %v\n", ip, err)
-			continue
-		}
+		// Envia comando "search" seguido pelo hash
+		fmt.Fprintf(conn, "search "+strconv.Itoa(hash)+"\n")
 
-		// Lê a resposta da máquina remota
-		netData, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			fmt.Printf("Error reading response from %s: %v\n", ip, err)
-			continue
-		}
+		// Lê a resposta do servidor
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+		message = strings.TrimSpace(message)
 
-		// Se a máquina remota tiver o arquivo, adiciona o IP dela à lista de resultados
-		if strings.TrimSpace(netData) == "found" {
-			result = append(result, ip)
+		if message != "Nenhuma máquina possui o arquivo." {
+			foundMachines = append(foundMachines, ip)
 		}
 	}
 
-	// Se nenhum IP foi encontrado com o hash solicitado
-	if len(result) == 0 {
-		fmt.Println("Não achamos nenhum arquivo com o mesmo hash")
-	}
+	return foundMachines
+}
 
-	return result
+func getLocalIP() string {
+	// Substitua por uma função que retorna o IP real da máquina local
+	return "150.165.42.168" // Exemplo estático, ajuste conforme necessário
 }
 
 func fileToHash(filePath string) (int, error) {
