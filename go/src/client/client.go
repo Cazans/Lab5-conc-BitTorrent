@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// Conectar ao servidor
-	conn, err := net.Dial("tcp", "127.0.0.1:8001")
+	conn, err := net.Dial("tcp", "localhost:8001")
 	if err != nil {
 		fmt.Println("Erro ao conectar-se ao servidor:", err)
 		return
@@ -25,7 +25,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		hashFiles.SendHash(conn, "127.0.0.1")
+		hashFiles.SendHash(conn, "localhost")
 	}()
 
 	// Ler entrada do usuário (hash para busca)

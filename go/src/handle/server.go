@@ -61,7 +61,7 @@ func handleConn(c net.Conn) {
 	defer c.Close()
 
 	reader := bufio.NewReader(c)
-	
+
 	for {
 		netData, err := reader.ReadString('\n')
 		if err != nil {
@@ -72,13 +72,13 @@ func handleConn(c net.Conn) {
 			log.Println("Error reading from connection:", err)
 			return
 		}
-		
+
 		netData = strings.TrimSpace(netData)
-		fmt.Println(netData)
+		fmt.Println("Received command:", netData)
 		parts := strings.SplitN(netData, " ", 2)
 
 		if len(parts) < 2 {
-			fmt.Fprintln(c, "Invalid command format")
+			fmt.Println("Invalid command format")
 			continue
 		}
 
@@ -86,38 +86,51 @@ func handleConn(c net.Conn) {
 		case "search":
 			hash, err := strconv.Atoi(parts[1])
 			if err != nil {
-				fmt.Fprintln(c, "Invalid hash format")
+				fmt.Println("Invalid hash format")
 				continue
 			}
 			search(c, hash)
 		case "update":
 			stringIp := c.RemoteAddr().String()
-			var ipClient string
-			ipClient = strings.Split(stringIp, ":")[0]
+			ipClient := strings.Split(stringIp, ":")[0]
 			hashParts := parts[1]
 			hash, err := strconv.Atoi(hashParts)
 			if err != nil {
-				fmt.Fprintln(c, "Invalid hash format")
+				fmt.Println("Invalid hash format")
 				continue
 			}
 			appendHash(hash, ipClient)
-			fmt.Fprintln(c, "Hash updated successfully")
+			fmt.Println("Hash updated successfully")
 		default:
-			fmt.Fprintln(c, "Unknown command")
+			fmt.Println("Unknown command")
 		}
 	}
 }
 
 func search(conn net.Conn, hash int) {
 	ips, found := hashs[hash]
-	if !found {
+	if !found || len(ips) == 0 {
 		fmt.Fprintln(conn, "No matches found")
 		return
 	}
-	fmt.Fprintln(conn, strings.Join(ips, ", "))
+
+	// Retornar os IPs associados ao hash, cada um em uma nova linha
+	for _, ip := range ips {
+		fmt.Fprintln(conn, ip)
+	}
 }
 
 func appendHash(hash int, ip string) {
-	hashs[hash] = append(hashs[hash], ip)
-	fmt.Println("Updated hashs map:", hashs)
+	// Verifica se o IP já está presente para o hash
+	ipSet := make(map[string]struct{})
+	for _, existingIP := range hashs[hash] {
+		ipSet[existingIP] = struct{}{}
+	}
+
+	if _, exists := ipSet[ip]; !exists {
+		hashs[hash] = append(hashs[hash], ip)
+		fmt.Println("Updated hashs map:", hashs)
+	} else {
+		fmt.Printf("IP %s already exists for hash %d\n", ip, hash)
+	}
 }
