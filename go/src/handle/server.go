@@ -21,7 +21,7 @@ type HashResponse struct {
 	IP   string
 }
 
-var hashs []HashResponse
+var hashs = make(map[int][]string)
 var ipsConfigs IpsConfigs
 
 func main() {
@@ -58,6 +58,7 @@ func loadIpsConfigs() {
 }
 
 func handleConn(c net.Conn) {
+	defer c.Close()
 
 	reader := bufio.NewReader(c)
 	
@@ -100,7 +101,7 @@ func handleConn(c net.Conn) {
 				continue
 			}
 			ip := hashParts[1]
-			appendHash(HashResponse{Hash: hash, IP: ip})
+			appendHash(hash, ip)
 			fmt.Fprintln(c, "Hash updated successfully")
 		default:
 			fmt.Fprintln(c, "Unknown command")
@@ -109,20 +110,15 @@ func handleConn(c net.Conn) {
 }
 
 func search(conn net.Conn, hash int) {
-	var response []string
-	for _, hashResponse := range hashs {
-		if hashResponse.Hash == hash {
-			response = append(response, hashResponse.IP)
-		}
-	}
-	if len(response) == 0 {
+	ips, found := hashs[hash]
+	if !found {
 		fmt.Fprintln(conn, "No matches found")
-	} else {
-		fmt.Fprintln(conn, strings.Join(response, ", "))
+		return
 	}
+	fmt.Fprintln(conn, strings.Join(ips, ", "))
 }
 
-func appendHash(response HashResponse) {
-	fmt.Println(response)
-	hashs = append(hashs, response)
+func appendHash(hash int, ip string) {
+	hashs[hash] = append(hashs[hash], ip)
+	fmt.Println("Updated hashs map:", hashs)
 }
