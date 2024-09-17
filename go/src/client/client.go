@@ -7,12 +7,12 @@ import (
 	"os"
 	"sync"
 
-	"lab5-conc/hashfiles" // Ajuste o caminho do módulo conforme necessário
+	"lab5-conc/hashFiles"
 )
 
 func main() {
 	// Conectar ao servidor
-	conn, err := net.Dial("tcp", "150.165.42.171:8000")
+	conn, err := net.Dial("tcp", "127.0.0.1:8001")
 	if err != nil {
 		fmt.Println("Erro ao conectar-se ao servidor:", err)
 		return
@@ -25,7 +25,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		hashfiles.SendHash(conn, "clientIP")
+		hashFiles.SendHash(conn, "127.0.0.1")
 	}()
 
 	// Ler entrada do usuário (hash para busca)

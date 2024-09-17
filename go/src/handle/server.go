@@ -27,7 +27,7 @@ var ipsConfigs IpsConfigs
 func main() {
 	loadIpsConfigs()
 
-	listener, err := net.Listen("tcp", "150.165.42.171:8001")
+	listener, err := net.Listen("tcp", "127.0.0.1:8001")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -74,6 +74,7 @@ func handleConn(c net.Conn) {
 		}
 		
 		netData = strings.TrimSpace(netData)
+		fmt.Println(netData)
 		parts := strings.SplitN(netData, " ", 2)
 
 		if len(parts) < 2 {

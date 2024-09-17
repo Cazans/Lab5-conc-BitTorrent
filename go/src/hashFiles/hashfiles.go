@@ -1,4 +1,4 @@
-package hashfiles
+package hashFiles
 
 import (
 	"fmt"
@@ -66,8 +66,8 @@ func SendHash(conn net.Conn, clientIP string) {
 			continue
 		}
 
-		// Enviar a mensagem ao servidor no formato "update <hash> <ip>"
-		message := fmt.Sprintf("update %d %s\n", hash, clientIP)
+		// Enviar a mensagem ao servidor no formato "update <hash>"
+		message := fmt.Sprintf("update %d\n", hash)
 		_, err = conn.Write([]byte(message))
 		if err != nil {
 			fmt.Printf("Error sending hash to server: %v\n", err)
