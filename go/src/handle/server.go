@@ -123,5 +123,6 @@ func search(conn net.Conn, hash int) {
 }
 
 func appendHash(response HashResponse) {
+	fmt.Println(response)
 	hashs = append(hashs, response)
 }
