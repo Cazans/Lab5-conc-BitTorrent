@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	// Conectar ao servidor
+	
 	conn, err := net.Dial("tcp", "localhost:8001")
 	if err != nil {
 		fmt.Println("Erro ao conectar-se ao servidor:", err)
@@ -28,15 +28,16 @@ func main() {
 		hashFiles.SendHash(conn, "localhost")
 	}()
 
-	// Ler entrada do usuário (hash para busca)
-	fmt.Print("Digite o comando de busca (ex: search <hash>): ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	fmt.Fprintf(conn, input)
+	for{
+		fmt.Print("Digite o comando de busca (ex: search <hash>): ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		fmt.Fprintf(conn, input)
 
-	serverResponse, _ := bufio.NewReader(conn).ReadString('\n')
-	fmt.Println("Resposta do servidor:", serverResponse)
-
-	// Aguarda a goroutine terminar antes de encerrar o programa
-	wg.Wait()
+		serverResponse, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Println("Resposta do servidor:", serverResponse)
+		wg.Wait()
+	}
+	
+	
 }

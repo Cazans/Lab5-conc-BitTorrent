@@ -78,7 +78,7 @@ func handleConn(c net.Conn) {
 		parts := strings.SplitN(netData, " ", 2)
 
 		if len(parts) < 2 {
-			fmt.Println("Invalid command format")
+			fmt.Fprintln(c,"Invalid command format")
 			continue
 		}
 
