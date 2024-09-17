@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
+
+	"lab5-conc/hashfiles" // Ajuste o caminho do módulo conforme necessário
 )
 
 func main() {
@@ -16,15 +19,24 @@ func main() {
 	}
 	defer conn.Close()
 
+	var wg sync.WaitGroup
+
+	// Iniciar goroutine para enviar hashes
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		hashfiles.SendHash(conn, "clientIP")
+	}()
+
 	// Ler entrada do usuário (hash para busca)
 	fmt.Print("Digite o comando de busca (ex: search <hash>): ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
-
-	// Enviar comando para o servidor
 	fmt.Fprintf(conn, input)
 
-	// Receber e imprimir a resposta do servidor
 	serverResponse, _ := bufio.NewReader(conn).ReadString('\n')
 	fmt.Println("Resposta do servidor:", serverResponse)
+
+	// Aguarda a goroutine terminar antes de encerrar o programa
+	wg.Wait()
 }
