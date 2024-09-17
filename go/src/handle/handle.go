@@ -94,7 +94,8 @@ func handleConn(c net.Conn) {
 
 func search(hash int) []string {
 	var result []string
-	// Simula a busca dos arquivos na máquina atual
+
+	// Caminho para o diretório local
 	dirPath := "/tmp/dataset"
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -102,19 +103,61 @@ func search(hash int) []string {
 		return result
 	}
 
+	// Verifica os arquivos locais primeiro
 	for _, file := range files {
 		filePath := dirPath + "/" + file.Name()
 		fileHash, err := fileToHash(filePath)
 		if err != nil {
 			continue
 		}
-		fmt.Println(fileHash)
+		// Se o hash do arquivo corresponde ao hash pesquisado
 		if fileHash == hash {
-			// Se o hash do arquivo corresponde ao hash pesquisado, adicione o IP à lista de resultados
-			result = append(result, ipsConfigs.Ips[0]) // Aqui você pode fazer uma correspondência real com IPs das máquinas
+			// Adiciona o IP da máquina local aos resultados
+			result = append(result, ipsConfigs.Ips[0]) // Aqui você pode usar o IP real da máquina local, se necessário
 		}
 	}
-	fmt.Println(result)
+
+	// Agora vamos verificar as outras máquinas listadas em ips.json
+	for _, ip := range ipsConfigs.Ips {
+		if ip == "localhost" {
+			// Já verificamos os arquivos locais, então pulamos o IP da máquina local
+			continue
+		}
+
+		// Abre uma conexão TCP com a máquina remota
+		conn, err := net.Dial("tcp", ip+":8000")
+		if err != nil {
+			fmt.Printf("Error connecting to %s: %v\n", ip, err)
+			continue
+		}
+		defer conn.Close()
+
+		// Envia a requisição de busca para a máquina remota
+		message := fmt.Sprintf("search %d\n", hash)
+		_, err = conn.Write([]byte(message))
+		if err != nil {
+			fmt.Printf("Error sending message to %s: %v\n", ip, err)
+			continue
+		}
+
+		// Lê a resposta da máquina remota
+		netData, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			fmt.Printf("Error reading response from %s: %v\n", ip, err)
+			continue
+		}
+
+		// Se a máquina remota tiver o arquivo, adiciona o IP dela à lista de resultados
+		if strings.TrimSpace(netData) == "found" {
+			result = append(result, ip)
+		}
+	}
+
+	// Se nenhum IP foi encontrado com o hash solicitado
+	if len(result) == 0 {
+		fmt.Println("Não achamos nenhum arquivo com o mesmo hash")
+	}
+
 	return result
 }
 
