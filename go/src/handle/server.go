@@ -90,18 +90,16 @@ func handleConn(c net.Conn) {
 			}
 			search(c, hash)
 		case "update":
-			hashParts := strings.SplitN(parts[1], " ", 2)
-			if len(hashParts) != 2 {
-				fmt.Fprintln(c, "Invalid update format. Expected format: <hash> <ip>")
-				continue
-			}
-			hash, err := strconv.Atoi(hashParts[0])
+			stringIp := c.RemoteAddr().String()
+			var ipClient string
+			ipClient = strings.Split(stringIp, ":")[0]
+			hashParts := parts[1]
+			hash, err := strconv.Atoi(hashParts)
 			if err != nil {
 				fmt.Fprintln(c, "Invalid hash format")
 				continue
 			}
-			ip := hashParts[1]
-			appendHash(hash, ip)
+			appendHash(hash, ipClient)
 			fmt.Fprintln(c, "Hash updated successfully")
 		default:
 			fmt.Fprintln(c, "Unknown command")
