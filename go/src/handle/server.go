@@ -2,30 +2,16 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 )
 
-type IpsConfigs struct {
-	Ips []string `json:"ips"`
-}
-
-type HashResponse struct {
-	Hash int
-	IP   string
-}
-
 var hashs = make(map[int][]string)
-var ipsConfigs IpsConfigs
 
 func main() {
-	loadIpsConfigs()
 
 	listener, err := net.Listen("tcp", "127.0.0.1:8001")
 	if err != nil {
@@ -43,20 +29,6 @@ func main() {
 	}
 }
 
-func loadIpsConfigs() {
-	jsonFile, err := os.Open("ips.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer jsonFile.Close()
-
-	byteValueJSON, _ := ioutil.ReadAll(jsonFile)
-	err = json.Unmarshal(byteValueJSON, &ipsConfigs)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func handleConn(c net.Conn) {
 	defer c.Close()
 
@@ -66,19 +38,19 @@ func handleConn(c net.Conn) {
 		netData, err := reader.ReadString('\n')
 		if err != nil {
 			if err.Error() == "EOF" {
-				fmt.Println("Connection closed by client")
+				fmt.Println("Conexão fechada pelo cliente")
 				return
 			}
-			log.Println("Error reading from connection:", err)
+			log.Println("Erro ao ler da conexão:", err)
 			return
 		}
 
 		netData = strings.TrimSpace(netData)
-		fmt.Println("Received command:", netData)
+		fmt.Println("Comando recebido:", netData)
 		parts := strings.SplitN(netData, " ", 2)
 
-		if len(parts) < 2 {
-			fmt.Fprintln(c,"Invalid command format")
+		if len(parts) < 2 && parts[0] != "update" {
+			fmt.Fprintln(c, "Formato de comando inválido")
 			continue
 		}
 
@@ -86,23 +58,30 @@ func handleConn(c net.Conn) {
 		case "search":
 			hash, err := strconv.Atoi(parts[1])
 			if err != nil {
-				fmt.Println("Invalid hash format")
+				fmt.Println("Formato de hash inválido")
 				continue
 			}
 			search(c, hash)
+
 		case "update":
+			// Imprime o mapa antes de atualizar
+			fmt.Println("Mapa de hashs ANTES da atualização:", hashs)
+
 			stringIp := c.RemoteAddr().String()
 			ipClient := strings.Split(stringIp, ":")[0]
-			hashParts := parts[1]
-			hash, err := strconv.Atoi(hashParts)
+
+			hash, err := strconv.Atoi(parts[1])
 			if err != nil {
-				fmt.Println("Invalid hash format")
-				continue
+				fmt.Fprintln(c, "Formato de hash inválido")
+				return
 			}
 			appendHash(hash, ipClient)
-			fmt.Println("Hash updated successfully")
+
+			// Imprime o mapa depois de atualizar
+			fmt.Println("Mapa de hashs DEPOIS da atualização:", hashs)
+
 		default:
-			fmt.Println("Unknown command")
+			fmt.Fprintln(c, "Comando desconhecido")
 		}
 	}
 }
@@ -110,11 +89,10 @@ func handleConn(c net.Conn) {
 func search(conn net.Conn, hash int) {
 	ips, found := hashs[hash]
 	if !found || len(ips) == 0 {
-		fmt.Fprintln(conn, "No matches found")
+		fmt.Fprintln(conn, "Nenhuma correspondência encontrada")
 		return
 	}
 
-	// Retornar os IPs associados ao hash, cada um em uma nova linha
 	for _, ip := range ips {
 		fmt.Fprintln(conn, ip)
 	}
@@ -129,8 +107,8 @@ func appendHash(hash int, ip string) {
 
 	if _, exists := ipSet[ip]; !exists {
 		hashs[hash] = append(hashs[hash], ip)
-		fmt.Println("Updated hashs map:", hashs)
+		fmt.Println("IP adicionado ao hash", hash)
 	} else {
-		fmt.Printf("IP %s already exists for hash %d\n", ip, hash)
+		fmt.Printf("IP %s já existe para o hash %d\n", ip, hash)
 	}
 }
