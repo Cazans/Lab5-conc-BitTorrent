@@ -13,7 +13,7 @@ var hashs = make(map[int][]string)
 
 func main() {
 
-	listener, err := net.Listen("tcp", "150.165.74.102:8001")
+	listener, err := net.Listen("tcp", "150.165.74.99:8001")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func handleConn(c net.Conn) {
 				intSlice = append(intSlice, num)
 			}
 			handleUpdate(intSlice, ipClient)
-
+			fmt.Fprintln(c, "Update realizado com sucesso!")
 		default:
 			fmt.Fprintln(c, "Comando desconhecido")
 		}
