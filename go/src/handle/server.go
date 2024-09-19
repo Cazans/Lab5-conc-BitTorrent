@@ -13,7 +13,7 @@ var hashs = make(map[int][]string)
 
 func main() {
 
-	listener, err := net.Listen("tcp", "127.0.0.1:8001")
+	listener, err := net.Listen("tcp", "150.165.74.102:8001")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,6 +86,23 @@ func handleConn(c net.Conn) {
 }
 
 func handleUpdate(intSlice []int, ip string) {
+	ipSet := make(map[string]struct{})
+	for _, hash := range intSlice {
+		for _, existingIP := range hashs[hash] {
+			ipSet[existingIP] = struct{}{}
+		}
+
+		if _, exists := hashs[hash]; !exists && ipSet[ip] == struct{}{} {
+			hashs[hash] = append(hashs[hash], ip)
+			fmt.Println("IP adicionado ao hash", hash)
+		} else if _, exists := ipSet[ip]; !exists{
+			hashs[hash] = append(hashs[hash], ip)
+			fmt.Println("IP adicionado ao hash", hash)
+		} else {
+			fmt.Printf("IP %s já existe para o hash %d\n", ip, hash)
+		}
+	}
+
 	var diferenca []int
 
 	for hash := range hashs {
@@ -98,20 +115,6 @@ func handleUpdate(intSlice []int, ip string) {
 		hashs[hash] = removerValor(hashs[hash], ip)
 		if len(hashs[hash]) == 0 {
 			delete(hashs, hash)
-		}
-	}
-
-	ipSet := make(map[string]struct{})
-	for _, hash := range intSlice {
-		for _, existingIP := range hashs[hash] {
-			ipSet[existingIP] = struct{}{}
-		}
-
-		if _, exists := ipSet[ip]; !exists {
-			hashs[hash] = append(hashs[hash], ip)
-			fmt.Println("IP adicionado ao hash", hash)
-		} else {
-			fmt.Printf("IP %s já existe para o hash %d\n", ip, hash)
 		}
 	}
 	fmt.Println(hashs)
@@ -141,8 +144,5 @@ func search(conn net.Conn, hash int) {
 		fmt.Fprintln(conn, "Nenhuma correspondência encontrada")
 		return
 	}
-
-	for _, ip := range ips {
-		fmt.Fprintln(conn, ip)
-	}
+	fmt.Fprintln(conn, ips)
 }
