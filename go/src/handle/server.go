@@ -13,7 +13,7 @@ var hashs = make(map[int][]string)
 
 func main() {
 
-	listener, err := net.Listen("tcp", "150.165.74.99:8001")
+	listener, err := net.Listen("tcp", "150.165.42.169:8001")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,8 +57,9 @@ func handleConn(c net.Conn) {
 		switch parts[0] {
 		case "search":
 			hash, err := strconv.Atoi(parts[1])
+			
 			if err != nil {
-				fmt.Println("Formato de hash inválido")
+				fmt.Fprintln(c, "Formato de hash inválido")
 				continue
 			}
 			search(c, hash)
@@ -72,7 +73,7 @@ func handleConn(c net.Conn) {
 			for _, s := range strSlice {
 				num, err := strconv.Atoi(s)
 				if err != nil {
-					fmt.Println("Erro ao converter string para inteiro:", err)
+					fmt.Println(c, "Erro ao converter string para inteiro:", err)
 					continue
 				}
 				intSlice = append(intSlice, num)
