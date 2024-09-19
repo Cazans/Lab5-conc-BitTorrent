@@ -31,6 +31,7 @@ func SendHash(conn net.Conn, clientIP string) {
 		return
 	}
 
+	var list []int
 	for _, file := range files {
 		filePath := dirPath + "/" + file.Name()
 		hash, err := fileToHash(filePath)
@@ -38,13 +39,14 @@ func SendHash(conn net.Conn, clientIP string) {
 			fmt.Printf("Erro ao calcular o hash do arquivo %s: %v\n", filePath, err)
 			continue
 		}
-
-		// Enviar o hash para o servidor no formato "update <hash>"
-		message := fmt.Sprintf("update %d\n", hash)
-		_, err = conn.Write([]byte(message))
+		list = append(list, hash)
 		if err != nil {
 			fmt.Printf("Erro ao enviar hash para o servidor: %v\n", err)
 			return
 		}
 	}
+
+	// Enviar o hash para o servidor no formato "update <hash>"
+	message := fmt.Sprintf("update %d\n", list)
+	_, err = conn.Write([]byte(message))
 }

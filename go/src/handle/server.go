@@ -64,26 +64,75 @@ func handleConn(c net.Conn) {
 			search(c, hash)
 
 		case "update":
-			// Imprime o mapa antes de atualizar
-			fmt.Println("Mapa de hashs ANTES da atualização:", hashs)
-
 			stringIp := c.RemoteAddr().String()
 			ipClient := strings.Split(stringIp, ":")[0]
-
-			hash, err := strconv.Atoi(parts[1])
-			if err != nil {
-				fmt.Fprintln(c, "Formato de hash inválido")
-				return
+			parts[1] = strings.Trim(parts[1], "[]")
+			strSlice := strings.Fields(parts[1])
+			intSlice := make([]int, 0, len(strSlice))
+			for _, s := range strSlice {
+				num, err := strconv.Atoi(s)
+				if err != nil {
+					fmt.Println("Erro ao converter string para inteiro:", err)
+					continue
+				}
+				intSlice = append(intSlice, num)
 			}
-			appendHash(hash, ipClient)
-
-			// Imprime o mapa depois de atualizar
-			fmt.Println("Mapa de hashs DEPOIS da atualização:", hashs)
+			handleUpdate(intSlice, ipClient)
 
 		default:
 			fmt.Fprintln(c, "Comando desconhecido")
 		}
 	}
+}
+
+func handleUpdate(intSlice []int, ip string) {
+	var diferenca []int
+
+	for hash := range hashs {
+		if !contem(intSlice, hash) {
+			diferenca = append(diferenca, hash)
+		}
+	}
+
+	for _, hash := range diferenca {
+		hashs[hash] = removerValor(hashs[hash], ip)
+		if len(hashs[hash]) == 0 {
+			delete(hashs, hash)
+		}
+	}
+
+	ipSet := make(map[string]struct{})
+	for _, hash := range intSlice {
+		for _, existingIP := range hashs[hash] {
+			ipSet[existingIP] = struct{}{}
+		}
+
+		if _, exists := ipSet[ip]; !exists {
+			hashs[hash] = append(hashs[hash], ip)
+			fmt.Println("IP adicionado ao hash", hash)
+		} else {
+			fmt.Printf("IP %s já existe para o hash %d\n", ip, hash)
+		}
+	}
+	fmt.Println(hashs)
+}
+
+func contem[T comparable](s []T, e T) bool {
+	for _, v := range s {
+		if v == e {
+			return true
+		}
+	}
+	return false
+}
+
+func removerValor(slice []string, valor string) []string {
+	for i, v := range slice {
+		if v == valor {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
 }
 
 func search(conn net.Conn, hash int) {
@@ -95,20 +144,5 @@ func search(conn net.Conn, hash int) {
 
 	for _, ip := range ips {
 		fmt.Fprintln(conn, ip)
-	}
-}
-
-func appendHash(hash int, ip string) {
-	// Verifica se o IP já está presente para o hash
-	ipSet := make(map[string]struct{})
-	for _, existingIP := range hashs[hash] {
-		ipSet[existingIP] = struct{}{}
-	}
-
-	if _, exists := ipSet[ip]; !exists {
-		hashs[hash] = append(hashs[hash], ip)
-		fmt.Println("IP adicionado ao hash", hash)
-	} else {
-		fmt.Printf("IP %s já existe para o hash %d\n", ip, hash)
 	}
 }
